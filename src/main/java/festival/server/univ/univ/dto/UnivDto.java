@@ -1,5 +1,6 @@
 package festival.server.univ.univ.dto;
 
+import festival.server.univ.univ.repository.UnivEntity;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -23,4 +24,21 @@ public class UnivDto {
     private String address;
     private String adrNum;
     private String homepage;
+
+
+    public UnivDto(UnivEntity univEntity) {
+        this.univId = univEntity.getUnivId();
+        this.stYear = univEntity.getStYear();
+        this.univCategory = univEntity.getUnivCategory();
+        this.univName = univEntity.getUnivName();
+        this.univStatus = univEntity.getUnivStatus();
+        this.branch = univEntity.getBranch();
+        this.cityDo = univEntity.getCityDo();
+        this.cityGu = univEntity.getCityGu();
+        this.foundation = univEntity.getFoundation();
+        this.dayNight = univEntity.getDayNight();
+        this.address = univEntity.getAddress();
+        this.adrNum = univEntity.getAdrNum();
+        this.homepage = univEntity.getHomepage();
+    }
 }

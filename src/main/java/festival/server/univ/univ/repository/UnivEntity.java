@@ -1,5 +1,6 @@
 package festival.server.univ.univ.repository;
 
+import festival.server.univ.crawling.repository.UnivSite;
 import festival.server.univ.univ.dto.UnivDto;
 
 import jakarta.persistence.*;
@@ -8,6 +9,8 @@ import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 
 import java.sql.Timestamp;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "UNIV")
@@ -42,6 +45,9 @@ public class UnivEntity {
     private String adrNum;
     @CreationTimestamp
     private Timestamp editDt;
+
+    @OneToMany(mappedBy = "univ")
+    private List<UnivSite> univSites = new ArrayList<>();
 
     public UnivEntity(String univId) {
         this.univId = univId;

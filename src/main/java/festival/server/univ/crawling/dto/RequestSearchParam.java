@@ -6,7 +6,8 @@ import lombok.Setter;
 @Getter
 @Setter
 public class RequestSearchParam {
-    private String cityDo; // 강원
+    private String cityGu; // 강원 춘천시
     private String univName; // XX대학교
+    private String siteName; // instagram
     private String postDate;
 }

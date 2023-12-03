@@ -1,6 +1,8 @@
 package festival.server.univ.univ.service;
 
 import festival.server.univ.crawling.dto.RequestSearchParam;
+import festival.server.univ.crawling.repository.UnivSite;
+import festival.server.univ.crawling.repository.UnivSiteRepository;
 import festival.server.univ.univ.dto.UnivDto;
 import festival.server.univ.univ.repository.UnivEntity;
 import festival.server.univ.univ.repository.UnivRepository;
@@ -20,6 +22,7 @@ import java.util.Optional;
 public class UnivMngService {
 
     final UnivRepository univRepository;
+    final UnivSiteRepository univSiteRepository;
 
     public void uploadUnivInfo(List<List<Object>> dataList) throws SQLException, IOException {
         for (int i = 5; i<dataList.size(); i++ ) {
@@ -33,7 +36,7 @@ public class UnivMngService {
                 univDto.setCityGu(row.get(7).toString());
 
                 // 없으면 makeKey
-                UnivEntity univ = getUniv(univDto)
+                UnivEntity univ = findUnivByDto(univDto)
                         .orElseGet(()->new UnivEntity(makeKey()));
 
                 univ.setUnivEntityByDto(
@@ -63,8 +66,12 @@ public class UnivMngService {
         univRepository.save(univ);
     }
 
-    public Optional<UnivEntity> getUniv(UnivDto univ) throws SQLException, IOException {
+    public Optional<UnivEntity> findUnivByDto(UnivDto univ) throws SQLException, IOException {
         return univRepository.findByNameAndCityGu(univ.getUnivName(), univ.getCityGu());
+    }
+
+    public Optional<UnivEntity> findUnivByParam(RequestSearchParam param) throws SQLException, IOException {
+        return univRepository.findUnivByParam(param);
     }
 
     private String makeKey() {
@@ -74,9 +81,13 @@ public class UnivMngService {
         return newKey;
     }
 
-    public String searchUnivUrl(RequestSearchParam param) {
+    public List<String> searchUnivUrl(RequestSearchParam param) throws SQLException, IOException {
         // 대학교 - 인스타URL 대조
-
-        return "https://www.instagram.com/donggukstuco/";
+        String univId = findUnivByParam(param).get().getUnivId();
+        List<UnivSite> univSites = univSiteRepository.findUnivSitesByUnivId(univId);
+        List<String> urlList = univSites.stream()
+                .filter(univSite -> univSite.getUrlSiteName().equals(param.getSiteName()))
+                .map(univSite -> univSite.getUrl()).toList();
+        return urlList;
     }
 }

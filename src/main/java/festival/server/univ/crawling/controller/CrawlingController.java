@@ -7,6 +7,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 
 @Slf4j
@@ -16,9 +17,9 @@ public class CrawlingController {
 
     final CrawlingService crawlingService;
 
-    @GetMapping("/crawling")
+    @PostMapping("/univ/crawling")
     public ResponseEntity<Integer> crawling(@RequestBody RequestSearchParam param) {
-
+        log.info("{}",param);
         return ResponseEntity.ok(crawlingService.processScraping(param));
     }
 }

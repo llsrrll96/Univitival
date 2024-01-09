@@ -1,5 +1,7 @@
 package festival.server.univ.crawling.service;
 
+import festival.server.univ.common.ApiResponseDTO;
+import festival.server.univ.common.DTOHandler;
 import festival.server.univ.crawling.dto.RequestSearchParam;
 import festival.server.univ.crawling.dto.UnivSiteDto;
 import festival.server.univ.univ.service.UnivMngService;
@@ -41,15 +43,16 @@ public class CrawlingService {
         this.univMngService = univMngService;
     }
 
-    public int processScraping(RequestSearchParam param) {
+    public List<String> processScraping(RequestSearchParam param) {
         System.setProperty(WEB_DRIVER_ID, WEB_DRIVER_PATH);
         ChromeOptions options = new ChromeOptions();
         options.setPageLoadStrategy(PageLoadStrategy.NORMAL);
         options.addArguments("--remote-allow-origins=*");
-        options.addArguments("headless");
+//        options.addArguments("headless");
 
         driver = new ChromeDriver(options);
 
+        List<String> univUrlList;
         try {
 //            driver.get(instaUrl);
 //            wait = new WebDriverWait(driver, Duration.ofSeconds(10));
@@ -59,7 +62,7 @@ public class CrawlingService {
 
             // 대학별 찾기
             // 대학교 url 검색, 여러개 일수도 있다..
-            List<String> univUrlList = univMngService.searchUnivUrl(param);
+            univUrlList = univMngService.searchUnivUrl(param);
             for (String univUrl : univUrlList) {
                 driver.get(univUrl);
                 // 페이지가 로딩될 때까지 기다리기
@@ -68,27 +71,28 @@ public class CrawlingService {
                 /* 게시물 리스트 가져오기 */
                  // 한 계정 첫 페이지의 게시물들 (12개) 링크를 가져옴
                 List<String> boardUrls = getBoardLinksByInstaAccount();
-
+                driver.quit();
+                return boardUrls;
                 // UnivSite table   조회해서 이미 조회한 url은 제외(filter).
 
+//                /* 크롤링된 정보 모으기 */
+//                List<UnivSiteDto> univSites = collectUnivSite(driver, boardUrls);
 
-                /* 크롤링된 정보 모으기 */
-                List<UnivSiteDto> univSites = collectUnivSite(driver, boardUrls);
-
-                /* 대동제 인지 검증 */
-                boolean isFestival = checkFestival(univSites.get(0));
-                // save festival table
-                /* UnivSite table기록 */
-
-
+//
+//
+//                /* 대동제 인지 검증 */
+//                boolean isFestival = checkFestival(univSites.get(0));
+//                // save festival table
+//                /* UnivSite table기록 */
             }
+
         } catch (Exception e) {
             e.printStackTrace();
-            return 0;
         } finally {
 //            driver.close();
         }
-        return 1;
+
+        return new ArrayList<>();
     }
 
     private List<String> getBoardLinksByInstaAccount() {
@@ -97,7 +101,7 @@ public class CrawlingService {
         List<String> boardUrls = new ArrayList<>();
         for (WebElement element : elements) {
             String href = element.findElement(By.tagName("a")).getAttribute("href");
-            log.info("12개 url 가져오기: {}",href);
+//            log.info("12개 url 가져오기: {}",href);
             boardUrls.add(href);
         }
         return boardUrls;

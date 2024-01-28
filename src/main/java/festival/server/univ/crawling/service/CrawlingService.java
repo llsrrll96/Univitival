@@ -1,9 +1,10 @@
 package festival.server.univ.crawling.service;
 
-import festival.server.univ.common.ApiResponseDTO;
-import festival.server.univ.common.DTOHandler;
+import festival.server.univ.common.CommonUtil;
 import festival.server.univ.crawling.dto.RequestSearchParam;
 import festival.server.univ.crawling.dto.UnivSiteDto;
+import festival.server.univ.crawling.repository.CrawlHistoryRepository;
+import festival.server.univ.crawling.repository.UnivSite;
 import festival.server.univ.univ.service.UnivMngService;
 import festival.server.univ.util.FileUtil;
 import lombok.extern.slf4j.Slf4j;
@@ -14,13 +15,13 @@ import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.WebDriverWait;
 import org.springframework.stereotype.Service;
 
+import java.text.SimpleDateFormat;
 import java.time.Duration;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -35,15 +36,20 @@ public class CrawlingService {
 
     WebDriverWait wait = null;
     WebDriver driver = null;
-    private Random random = new Random();
+    Random random = new Random();
+    SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
 
     final UnivMngService univMngService;
+    final UnivSiteService univSiteService;
+    final CrawlHistoryRepository crawlHistoryRepository;
 
-    public CrawlingService(UnivMngService univMngService) {
+    public CrawlingService(UnivMngService univMngService, UnivSiteService univSiteService, CrawlHistoryRepository crawlHistoryRepository) {
         this.univMngService = univMngService;
+        this.univSiteService = univSiteService;
+        this.crawlHistoryRepository = crawlHistoryRepository;
     }
 
-    public List<String> processScraping(RequestSearchParam param) {
+    public int processScraping(RequestSearchParam param) {
         System.setProperty(WEB_DRIVER_ID, WEB_DRIVER_PATH);
         ChromeOptions options = new ChromeOptions();
         options.setPageLoadStrategy(PageLoadStrategy.NORMAL);
@@ -52,48 +58,57 @@ public class CrawlingService {
 
         driver = new ChromeDriver(options);
 
-        List<String> univUrlList;
+        List<UnivSite> univSiteList;
+        int count = 0;
         try {
-//            driver.get(instaUrl);
-//            wait = new WebDriverWait(driver, Duration.ofSeconds(10));
-//
-//            // 인스타그램 로그인
-//            loginInsta();
 
             // 대학별 찾기
             // 대학교 url 검색, 여러개 일수도 있다..
-            univUrlList = univMngService.searchUnivUrl(param);
-            for (String univUrl : univUrlList) {
-                driver.get(univUrl);
+            univSiteList = univMngService.searchUnivUrl(param);
+            String univId = univMngService.findUnivByParam(param).get().getUnivId();
+            for (UnivSite univSite : univSiteList) {
+                driver.get(univSite.getUrl());
                 // 페이지가 로딩될 때까지 기다리기
-                waitForPageLoad(driver,"article");
+                waitForPageLoad(driver, "article");
+
 
                 /* 게시물 리스트 가져오기 */
-                 // 한 계정 첫 페이지의 게시물들 (12개) 링크를 가져옴
+                // 한 계정 첫 페이지의 게시물들 (12개) 링크를 가져옴
+                // 최근 12개로 변경 - id 로그인이 막힘
                 List<String> boardUrls = getBoardLinksByInstaAccount();
-                driver.quit();
-                return boardUrls;
-                // UnivSite table   조회해서 이미 조회한 url은 제외(filter).
+                List<String> urlHistoryList = crawlHistoryRepository.findUrlsByUnivId(univId);
+                // history table 조회해서 이미 조회한 url은 제외(filter).
+                boardUrls = boardUrls.stream()
+                        .filter(boardUrl -> !urlHistoryList.contains(boardUrl))
+                        .collect(Collectors.toList());
 
-//                /* 크롤링된 정보 모으기 */
-//                List<UnivSiteDto> univSites = collectUnivSite(driver, boardUrls);
 
-//
-//
-//                /* 대동제 인지 검증 */
-//                boolean isFestival = checkFestival(univSites.get(0));
-//                // save festival table
-//                /* UnivSite table기록 */
+                /*
+                    크롤링된 정보 모으기
+                    12개 게시물 모두 순회
+                */
+                List<UnivSiteDto> univSites = collectUnivSite(driver, boardUrls, param.getFromDate());
+                univSites.forEach(u -> {
+                            u.setUnivId(univId);
+                            u.setContent(CommonUtil.changeWithEmoji(u.getContent()));
+                        }
+                );
+
+                // history 저장
+                univSiteService.saveCrawlHistory(univSites);
+                count = univSites.size();
             }
+
+            driver.quit();
+            return count;
 
         } catch (Exception e) {
             e.printStackTrace();
-        } finally {
-//            driver.close();
         }
-
-        return new ArrayList<>();
+        driver.quit();
+        return 0;
     }
+
 
     private List<String> getBoardLinksByInstaAccount() {
         String boardClasses = "div._aabd._aa8k._al3l";
@@ -101,22 +116,16 @@ public class CrawlingService {
         List<String> boardUrls = new ArrayList<>();
         for (WebElement element : elements) {
             String href = element.findElement(By.tagName("a")).getAttribute("href");
-//            log.info("12개 url 가져오기: {}",href);
+            log.info("12개 url 가져오기: {}",href);
             boardUrls.add(href);
         }
         return boardUrls;
     }
 
-    private boolean checkFestival(UnivSiteDto univSiteDto) {
-        // 대학에 대한 키워드 들고옴
-
-        return false;
-    }
-
     /**
      * url 순회하면서 게시물 정보를 UnivSiteDto에 저장
      */
-    private List<UnivSiteDto> collectUnivSite(WebDriver driver, List<String> urlList) {
+    private List<UnivSiteDto> collectUnivSite(WebDriver driver, List<String> urlList, String fromDate) {
         List<UnivSiteDto> univSites = new ArrayList<>();
         for (String url : urlList) {
             driver.get(url);
@@ -132,18 +141,67 @@ public class CrawlingService {
             String time = timeElems.get(1).getAttribute("datetime");
             time = time.substring(0, time.indexOf("T"));
 
+            // 시간 비교하는 로직
+            if (Integer.parseInt(time.replace("-", "")) <
+                    Integer.parseInt(fromDate.replace("-", ""))) {
+                break;
+            }
+
             UnivSiteDto univSiteDto = new UnivSiteDto();
             univSiteDto.setUrl(url);
             univSiteDto.setContent(content);
-            univSiteDto.setUrlDate(time);
+            univSiteDto.setUrlDate(time); // 게시 일자
+            univSiteDto.setUrlSiteName("instagram");
             log.debug("############ univSiteDto: {}", univSiteDto);
 
-            scrollRandom(driver);
             univSites.add(univSiteDto);
+
+            // 휴식
             sleepRandomSeconds(1,3);
+            scrollRandom(driver);
+
         }
         return univSites;
     }
+
+
+    public String loginInsta() {
+        System.setProperty(WEB_DRIVER_ID, WEB_DRIVER_PATH);
+        ChromeOptions options = new ChromeOptions();
+        options.setPageLoadStrategy(PageLoadStrategy.NORMAL);
+        options.addArguments("--remote-allow-origins=*");
+//        options.addArguments("headless");
+
+        driver = new ChromeDriver(options);
+
+        try {
+            driver.get(instaUrl);
+            wait = new WebDriverWait(driver, Duration.ofSeconds(10));
+
+            // 서버내 파일에서 계정 정보 들고오도록
+            Map<String,Object> idpw = FileUtil.readIDPWFromFile();
+            username = idpw.get("username").toString();
+            password = idpw.get("password").toString();
+
+            WebElement usernameInput = wait.until(ExpectedConditions.presenceOfElementLocated(By.name("username")));
+            usernameInput.sendKeys(username);
+
+            WebElement passwordInput = wait.until(ExpectedConditions.presenceOfElementLocated(By.name("password")));
+            passwordInput.sendKeys(password);
+
+            WebElement submitButton = driver.findElement(By.tagName("button")); // 태그명이 "button"인 경우
+            submitButton.submit();
+
+            return "success";
+        } catch (Exception e) {
+            log.info(e.toString());
+            return "false";
+        }
+    }
+
+
+
+
 
     /*************************************************************************/
 
@@ -158,22 +216,6 @@ public class CrawlingService {
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
-    }
-
-    private void loginInsta() {
-        // 서버내 파일에서 계정 정보 들고오도록
-        Map<String,Object> idpw = FileUtil.readIDPWFromFile();
-        username = idpw.get("username").toString();
-        password = idpw.get("password").toString();
-
-        WebElement usernameInput = wait.until(ExpectedConditions.presenceOfElementLocated(By.name("username")));
-        usernameInput.sendKeys(username);
-
-        WebElement passwordInput = wait.until(ExpectedConditions.presenceOfElementLocated(By.name("password")));
-        passwordInput.sendKeys(password);
-
-        WebElement submitButton = driver.findElement(By.tagName("button")); // 태그명이 "button"인 경우
-        submitButton.submit();
     }
 
     private void scrollToBottom(WebDriver driver) {
@@ -203,5 +245,12 @@ public class CrawlingService {
 
         // 페이지의 로딩이 완료되기를 기다리는 조건 설정
         wait.until(ExpectedConditions.presenceOfElementLocated(By.tagName(tagName)));
+    }
+
+    private void waitForPageLoadByClassName(WebDriver driver, String className) {
+        WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(10));
+
+        // 페이지의 로딩이 완료되기를 기다리는 조건 설정
+        wait.until(ExpectedConditions.presenceOfElementLocated(By.className(className)));
     }
 }

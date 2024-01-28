@@ -15,6 +15,7 @@ import java.io.IOException;
 import java.sql.SQLException;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -81,13 +82,13 @@ public class UnivMngService {
         return newKey;
     }
 
-    public List<String> searchUnivUrl(RequestSearchParam param) throws SQLException, IOException {
+    public List<UnivSite> searchUnivUrl(RequestSearchParam param) throws SQLException, IOException {
         // 대학교 - 인스타URL 대조
         String univId = findUnivByParam(param).get().getUnivId();
         List<UnivSite> univSites = univSiteRepository.findUnivSitesByUnivId(univId);
-        List<String> urlList = univSites.stream()
+        univSites = univSites.stream()
                 .filter(univSite -> univSite.getUrlSiteName().equals(param.getSiteName()))
-                .map(univSite -> univSite.getUrl()).toList();
-        return urlList;
+                .collect(Collectors.toList());
+        return univSites;
     }
 }

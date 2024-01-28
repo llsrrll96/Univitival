@@ -15,4 +15,5 @@ public class UnivSiteDto {
     private String urlSiteName;
     private String content;
     private String urlDate; // 게시된 url date
+    private String univId;
 }

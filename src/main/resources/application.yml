@@ -4,7 +4,7 @@ server:
 spring:
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://localhost:3306/appdb?useSSL=false&allowPublicKeyRetrieval=true&useUnicode=true&serverTimezone=Asia/Seoul
+    url: jdbc:mysql://localhost:3306/appdb?useSSL=false&serverTimezone=Asia/Seoul&characterEncoding=UTF-8&allowPublicKeyRetrieval=true
     username: admin
     password: admin
 
@@ -13,5 +13,6 @@ spring:
     properties:
       hibernate:
         format_sql: true
+    dialect: org.hibernate.dialect.MySQL8Dialect
     hibernate:
       ddl-auto: update

@@ -9,5 +9,5 @@ public class RequestSearchParam {
     private String cityGu; // 강원 춘천시
     private String univName; // XX대학교
     private String siteName; // instagram
-    private String postDate;
+    private String fromDate;
 }
